@@ -98,3 +98,61 @@ This comparison shows how to compute those metrics:
 | **NumPy** | Fast CPU vectorization; natural for embedding matrices | No GPU; you assemble distances yourself |
 | **SciPy** | One-liners for many metrics (`euclidean`, `cosine`, `cdist`) | Less ideal as the *core* of a large ANN system; CPU-bound |
 | **PyTorch** | Same code path as your embedder; GPU + `topk` retrieval | Overkill for tiny CPU-only scripts |
+
+---
+
+## Mechanism differences
+
+What actually happens under the hood when you “search”:
+
+```mermaid
+flowchart LR
+    Q["Query text"] --> E["Embedder<br/>(e.g. sentence-transformers)"]
+    D["Documents"] --> E
+    E --> QV["Query vector q"]
+    E --> DV["Doc matrix D<br/>(n × dim)"]
+    QV --> S["Score: L2 / dot / cosine"]
+    DV --> S
+    S --> R["Rank → top-k docs"]
+```
+
+### Mechanism matrix
+
+| Mechanism step | Manual | NumPy | SciPy | PyTorch |
+|---|---|---|---|---|
+| Representation | Python lists / arrays you manage | `ndarray` | `ndarray` in, floats out | `Tensor` (CPU or GPU) |
+| Core compute | Explicit sums / loops or hand matmul | BLAS-backed matmul & reductions | Optimized distance kernels | Highly optimized tensor kernels |
+| Normalization | You divide by norms yourself | `np.linalg.norm(..., keepdims=True)` | Often inside metric (`cosine`) | `F.normalize(..., p=2, dim=-1)` |
+| Similarity → rank | `max` / `argmax` you write | `np.argmax` | Sort distances ascending | `torch.argmax` / `torch.topk` |
+| Scaling to many docs | Poor unless you matmul carefully | Good on CPU for moderate n | Good for pairwise utilities | Best when GPU + large batches |
+
+### Why cosine often becomes a dot product
+
+1. Embed query and docs  
+2. L2-normalize each vector to unit length  
+3. Cosine similarity collapses to the **dot product**  
+4. Rank with `argmax` on `D @ q`
+
+That is the standard “similarity search by hand” pattern in embedding labs and a common building block before ANN indexes (FAISS, etc.).
+
+---
+
+## When to use which
+
+| Situation | Recommendation |
+|---|---|
+| Learning L2 / dot / cosine for the first time | **Manual** formulas, then verify with a library |
+| Notebook RAG prototype on CPU | **NumPy** (`normalize` + `@` + `argmax`) |
+| Need many pairwise distances quickly | **SciPy** `cdist` / `pdist` |
+| Embeddings already in PyTorch / on GPU | **PyTorch** (`F.normalize`, `matmul`, `topk`) |
+| Production ANN over millions of vectors | Use a vector DB / FAISS / HNSW — libraries above for *scoring math*, not full-scale search |
+| Unit tests for “did my metric match?” | Compute **manual** or NumPy reference; assert SciPy/Torch match within tolerance |
+
+### Metric: when to prefer which
+
+| Situation | Prefer |
+|---|---|
+| Embeddings are (or will be) unit-normalized | **Cosine** or **dot** (equivalent after normalize) |
+| Magnitude should matter (e.g. unnormalized features) | **Dot** or **L2** — be explicit about the choice |
+| You think in “distance to nearest neighbor” | **L2** (or cosine *distance* = `1 - cosine`) |
+| Semantic text embeddings for RAG | **Cosine** (or normalized **dot**) is the usual default |
