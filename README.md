@@ -20,6 +20,8 @@
 6. [Worked example: cosine search by hand](#worked-example-cosine-search-by-hand)
 7. [Decision guide](#decision-guide)
 8. [Wrap-up](#wrap-up)
+9. [Project structure](#project-structure)
+10. [Quick start](#quick-start)
 
 ---
 
@@ -247,3 +249,52 @@ Takeaways:
 - The **metric** chooses *what* “similar” means; the **library** chooses *how* you compute it efficiently.
 - For normalized embeddings, **cosine ≡ dot product**, so RAG retrieval often reduces to one matrix multiply and an `argmax` / `topk`.
 - Use **manual** to learn, **NumPy/SciPy** for CPU prototypes, **PyTorch** when you are already on tensors/GPU, and a dedicated **ANN / vector store** when the corpus outgrows dense brute-force search.
+
+---
+
+## Project structure
+
+```text
+Similarity-Search-Comparison-for-RAG/
+├── README.md
+├── LICENSE
+├── pyproject.toml
+├── requirements.txt
+├── src/
+│   ├── __init__.py
+│   ├── compare.py                 # Run all backends on one corpus/query
+│   ├── data/
+│   │   └── samples.py             # Shared documents + query
+│   └── metrics/
+│       ├── manual.py              # Explicit-loop formulas
+│       ├── numpy_backend.py       # Vectorized NumPy search
+│       ├── scipy_backend.py       # SciPy cdist distances
+│       └── torch_backend.py       # Tensor / GPU-friendly path
+├── examples/
+│   └── run_comparison.py          # Rich CLI side-by-side demo
+└── tests/
+    └── test_metrics.py            # Cross-backend parity checks
+```
+
+---
+
+## Quick start
+
+```bash
+cd Similarity-Search-Comparison-for-RAG
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Side-by-side backend comparison
+python examples/run_comparison.py
+
+# Parity tests (no model download required)
+pytest -q
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
