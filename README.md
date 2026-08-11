@@ -65,3 +65,36 @@ This comparison shows how to compute those metrics:
 | Intuition | “How far apart?” | “How aligned *and* strong?” | “How aligned in meaning space?” |
 
 > **Practical RAG tip:** Many embedding models already L2-normalize vectors. After that, **cosine similarity ≡ dot product**, so retrieval can use a single matrix multiply: `docs @ query.T`.
+
+---
+
+## Library comparison matrix
+
+### Capabilities
+
+| Concern | Manual | NumPy | SciPy | PyTorch |
+|---|---|---|---|---|
+| Teaches the math | Excellent | Good | Opaque helpers | Good if you know tensors |
+| Boilerplate | High | Low | Lowest for pairwise distances | Low–medium |
+| Batch query × corpus | You write loops / matmul | `A @ B.T`, broadcasting | `cdist` / `pdist` | `matmul`, `cdist`, `topk` |
+| GPU acceleration | No | No (CPU) | No (CPU) | Yes (CUDA / MPS) |
+| Autograd / training | No | No | No | Yes |
+| Dependency weight | None | Light | Medium | Heavier |
+| Idiomatic in ML notebooks | Rare outside tutorials | Very common | Common for distances | Common next to models |
+
+### How you typically call each metric
+
+| Metric | Manual | NumPy | SciPy | PyTorch |
+|---|---|---|---|---|
+| L2 distance | \(\sqrt{\sum (a_i-b_i)^2}\) | `np.linalg.norm(a-b, axis=-1)` | `distance.euclidean` / `cdist(..., 'euclidean')` | `torch.cdist` / `torch.norm(a-b, dim=-1)` |
+| Dot product | \(\sum a_i b_i\) | `a @ b` / `np.dot` | (use NumPy; SciPy is distance-focused) | `torch.dot` / `a @ b` |
+| Cosine similarity | \(\frac{a\cdot b}{\|a\|\|b\|}\) | normalize rows → `@` | `1 - distance.cosine` or `cdist(..., 'cosine')` then convert | `F.normalize` + `@`, or `F.cosine_similarity` |
+
+### Strengths & trade-offs
+
+| Library | Strengths | Trade-offs |
+|---|---|---|
+| **Manual** | Full transparency; great for interviews / labs | Easy to get broadcasting / axis bugs; slow if naively looped |
+| **NumPy** | Fast CPU vectorization; natural for embedding matrices | No GPU; you assemble distances yourself |
+| **SciPy** | One-liners for many metrics (`euclidean`, `cosine`, `cdist`) | Less ideal as the *core* of a large ANN system; CPU-bound |
+| **PyTorch** | Same code path as your embedder; GPU + `topk` retrieval | Overkill for tiny CPU-only scripts |
