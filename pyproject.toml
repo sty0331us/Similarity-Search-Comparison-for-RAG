@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "similarity-search-comparison-for-rag"
+version = "0.1.0"
+description = "Compare Manual, NumPy, SciPy, and PyTorch similarity search for RAG"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "sty0331us" }]
+dependencies = [
+  "numpy>=1.26.0,<3.0.0",
+  "scipy>=1.11.0,<2.0.0",
+  "torch>=2.2.0,<3.0.0",
+  "rich>=13.7.0,<14.0.0",
+]
+
+[project.optional-dependencies]
+embed = ["sentence-transformers>=3.0.0,<4.0.0"]
+dev = ["pytest>=8.0.0,<9.0.0", "ruff>=0.5.0,<1.0.0"]
+
+[project.scripts]
+sscr-compare = "examples.run_comparison:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
