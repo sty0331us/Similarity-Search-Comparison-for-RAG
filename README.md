@@ -156,3 +156,94 @@ That is the standard “similarity search by hand” pattern in embedding labs a
 | Magnitude should matter (e.g. unnormalized features) | **Dot** or **L2** — be explicit about the choice |
 | You think in “distance to nearest neighbor” | **L2** (or cosine *distance* = `1 - cosine`) |
 | Semantic text embeddings for RAG | **Cosine** (or normalized **dot**) is the usual default |
+
+---
+
+## Worked example: cosine search by hand
+
+Four documents:
+
+```python
+documents = [
+    "Bugs introduced by the intern had to be squashed by the lead developer.",
+    "Bugs found by the quality assurance engineer were difficult to debug.",
+    "Bugs are common throughout the warm summer months, according to the entomologist.",
+    "Bugs, in particular spiders, are extensively studied by arachnologists.",
+]
+```
+
+**Query:** *Who is responsible for a coding project and fixing others' mistakes?*
+
+Reuse precomputed `normalized_embeddings_manual` for the documents, then:
+
+```python
+### YOUR CODE GOES HERE ###
+# First, embed the query:
+query_embedding = model.encode(
+    ["Who is responsible for a coding project and fixing others' mistakes?"]
+)
+
+# Second, normalize the query embedding:
+normalized_query_embedding = torch.nn.functional.normalize(
+    torch.from_numpy(query_embedding)
+).numpy()
+
+# Third, cosine similarity via dot product (vectors are unit-normalized):
+cosine_similarity_q3 = normalized_embeddings_manual @ normalized_query_embedding.T
+
+# Fourth, position with highest cosine similarity:
+highest_cossim_position = cosine_similarity_q3.argmax()
+
+# Fifth, map back to the document:
+documents[highest_cossim_position]
+```
+
+**Expected retrieval:**
+
+> `Bugs introduced by the intern had to be squashed by the lead developer.`
+
+That matches the query’s coding / ownership meaning, not the entomology sense of “bugs.”
+
+### Same idea mapped to each library
+
+| Step | Manual / NumPy | SciPy | PyTorch |
+|---|---|---|---|
+| Embed | `model.encode(...)` → `ndarray` | same | same (convert with `torch.from_numpy`) |
+| Normalize | divide by `np.linalg.norm` | optional if using `cosine` distance | `F.normalize(tensor, p=2, dim=-1)` |
+| Score vs corpus | `docs @ query.T` | `cdist(docs, query, metric='cosine')` then take `1 - d` or rank by smallest distance | `F.cosine_similarity` or normalize + `matmul` |
+| Pick best | `argmax` on similarity | `argmin` on cosine *distance* | `argmax` / `topk` |
+
+---
+
+## Decision guide
+
+```mermaid
+flowchart TD
+    Q0{"Goal?"}
+    Q0 -->|"Understand the formulas"| MAN["Manual implementation"]
+    Q0 -->|"Ship / prototype retrieval"| Q1
+
+    Q1{"Where do vectors live?"}
+    Q1 -->|"Already PyTorch / need GPU"| TORCH["PyTorch: normalize + matmul / topk"]
+    Q1 -->|"NumPy arrays on CPU"| Q2
+
+    Q2{"Need a built-in distance catalog?"}
+    Q2 -->|Yes| SCIPY["SciPy spatial.distance / cdist"]
+    Q2 -->|No| NUMPY["NumPy: normalize + @ + argmax"]
+
+    Q3{"Corpus size?"}
+    Q3 -->|"Thousands (fitting in RAM)"| NUMPY
+    Q3 -->|"Millions+"| ANN["ANN index / vector DB<br/>(FAISS, etc.) — score math still as above"]
+```
+
+---
+
+## Wrap-up
+
+This comparison walks through **L2 distance**, **dot product similarity/distance**, and **cosine similarity/distance** for similarity search — both with manually defined math and with **NumPy**, **SciPy**, and **PyTorch**.
+
+Takeaways:
+
+- The **metric** chooses *what* “similar” means; the **library** chooses *how* you compute it efficiently.
+- For normalized embeddings, **cosine ≡ dot product**, so RAG retrieval often reduces to one matrix multiply and an `argmax` / `topk`.
+- Use **manual** to learn, **NumPy/SciPy** for CPU prototypes, **PyTorch** when you are already on tensors/GPU, and a dedicated **ANN / vector store** when the corpus outgrows dense brute-force search.
