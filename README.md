@@ -1,4 +1,4 @@
-# Similarity Search Comparison for RAG
+# NumPy / SciPy / Torch Similarity for RAG
 
 **Manual math vs NumPy vs SciPy vs PyTorch** — the same vector similarity metrics (L2, dot product, cosine) computed several ways so you can see *when* to use each library and *how* the mechanisms differ for RAG retrieval.
 
@@ -255,7 +255,7 @@ Takeaways:
 ## Project structure
 
 ```text
-Similarity-Search-Comparison-for-RAG/
+NumPy-SciPy-Torch-Similarity-for-RAG/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
@@ -281,7 +281,7 @@ Similarity-Search-Comparison-for-RAG/
 ## Quick start
 
 ```bash
-cd Similarity-Search-Comparison-for-RAG
+cd NumPy-SciPy-Torch-Similarity-for-RAG
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
