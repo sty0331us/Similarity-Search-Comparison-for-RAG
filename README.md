@@ -20,6 +20,11 @@ NumPy / SciPy / PyTorch appear only as **execution backends** (secondary): they 
 3. [Head-to-head comparison](#head-to-head-comparison)
 4. [When rankings disagree](#when-rankings-disagree)
 5. [Normalization: cosine ≡ inner product](#normalization-cosine--inner-product)
+6. [Decision guide for RAG](#decision-guide-for-rag)
+7. [Worked example](#worked-example)
+8. [Project structure](#project-structure)
+9. [Quick start](#quick-start)
+10. [Execution backends (secondary)](#execution-backends-secondary)
 
 ---
 
@@ -161,3 +166,129 @@ cosine(a, b) = a·b    when ||a|| = ||b|| = 1
 Many embedding models already return normalized vectors. In that case, “cosine search” and “dot-product search” are the same operation — pick whichever API your stack exposes.
 
 ---
+
+## Decision guide for RAG
+
+```mermaid
+flowchart TD
+    Q0{"Are embeddings L2-normalized?"}
+    Q0 -->|Yes| EQ["Cosine ≡ Inner Product<br/>use either; Euclidean ranking matches too"]
+    Q0 -->|No| Q1{"Should vector length affect relevance?"}
+    Q1 -->|No — direction only| COS["Use Cosine Similarity"]
+    Q1 -->|Yes — length is meaningful| Q2{"Similarity or distance framing?"}
+    Q2 -->|Similarity score| IP["Use Inner Product"]
+    Q2 -->|Nearest neighbor| L2["Use Euclidean Distance"]
+```
+
+| Situation | Prefer |
+|---|---|
+| Semantic text embeddings (typical RAG) | **Cosine**, or **inner product** after normalize |
+| Embeddings already unit-normalized | **Inner product** (≡ cosine) for a single matmul |
+| Magnitude should matter | **Inner product** or **Euclidean** — be explicit |
+| Thinking in “distance to nearest neighbor” | **Euclidean** (or cosine *distance* = `1 − cosine`) |
+| ANN index that only supports L2 | **Euclidean** on normalized vectors ≈ cosine ranking |
+
+---
+
+## Worked example
+
+Sample documents (polysemous “bugs”):
+
+```python
+documents = [
+    "Bugs introduced by the intern had to be squashed by the lead developer.",
+    "Bugs found by the quality assurance engineer were difficult to debug.",
+    "Bugs are common throughout the warm summer months, according to the entomologist.",
+    "Bugs, in particular spiders, are extensively studied by arachnologists.",
+]
+```
+
+**Query:** *Who is responsible for a coding project and fixing others' mistakes?*
+
+```python
+from src.compare import compare_metrics
+from src.metrics import Metric, l2_normalize
+
+# docs: (n, d), query: (d,)  — from your embedder
+docs_n = l2_normalize(docs, axis=1)
+query_n = l2_normalize(query)
+
+comparison = compare_metrics(docs_n, query_n)
+for result in comparison.results:
+    print(result.display_name, "→ doc", result.best_index, "score", result.scores[result.best_index])
+```
+
+With unit-normalized embeddings, Cosine and Inner Product return the **same** top document (and the same scores). Euclidean returns the same top document via `argmin`.
+
+**Expected semantic hit** (coding / ownership sense of “bugs”):
+
+> `Bugs introduced by the intern had to be squashed by the lead developer.`
+
+---
+
+## Project structure
+
+```text
+Vector-Similarity-Metrics-for-RAG/
+├── README.md
+├── LICENSE
+├── pyproject.toml
+├── requirements.txt
+├── src/
+│   ├── compare.py                 # Primary: compare_metrics(); secondary: backends
+│   ├── data/
+│   │   └── samples.py             # RAG docs + magnitude-disagreement vectors
+│   └── metrics/
+│       ├── types.py               # Metric enum, formulas, ranking rules
+│       ├── scoring.py             # Score / rank by metric
+│       └── backends/              # Secondary execution paths
+│           ├── manual.py
+│           ├── numpy_backend.py
+│           ├── scipy_backend.py
+│           └── torch_backend.py
+├── examples/
+│   └── run_comparison.py          # Metric-first CLI demo
+└── tests/
+    └── test_metrics.py            # Disagreement, normalization, backend parity
+```
+
+---
+
+## Quick start
+
+```bash
+cd Vector-Similarity-Metrics-for-RAG
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Compare Cosine vs Inner Product vs Euclidean
+python examples/run_comparison.py
+
+# Optional: also show Manual / NumPy / SciPy / PyTorch parity
+python examples/run_comparison.py --with-backends
+
+# Tests (no model download required)
+pytest -q
+```
+
+---
+
+## Execution backends (secondary)
+
+Libraries are interchangeable ways to **implement** a metric — not the thing being compared:
+
+| Backend | Role |
+|---|---|
+| **Manual** | Explicit loops — best for learning the formulas |
+| **NumPy** | Default reference for CPU batch scoring |
+| **SciPy** | `spatial.distance` / `cdist` helpers |
+| **PyTorch** | Tensor path (GPU / model-adjacent stacks) |
+
+Parity across backends is checked in tests and via `--with-backends`. If backends disagree, that is a bug; if **metrics** disagree, that is expected geometry.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
