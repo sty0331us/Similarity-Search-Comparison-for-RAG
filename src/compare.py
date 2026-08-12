@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.metrics import manual, numpy_backend, scipy_backend, torch_backend
+from src.metrics.backends import manual, numpy_backend, scipy_backend, torch_backend
 
 
 @dataclass(frozen=True)

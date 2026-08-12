@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from src.compare import backends_agree_on_argmax, compare_backends
-from src.metrics import manual, numpy_backend, scipy_backend, torch_backend
+from src.metrics.backends import manual, numpy_backend, scipy_backend, torch_backend
 
 
 @pytest.fixture
