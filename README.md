@@ -17,6 +17,9 @@ NumPy / SciPy / PyTorch appear only as **execution backends** (secondary): they 
 
 1. [Why metric choice matters](#why-metric-choice-matters)
 2. [The three metrics](#the-three-metrics)
+3. [Head-to-head comparison](#head-to-head-comparison)
+4. [When rankings disagree](#when-rankings-disagree)
+5. [Normalization: cosine ≡ inner product](#normalization-cosine--inner-product)
 
 ---
 
@@ -96,5 +99,65 @@ a \cdot b = \sum_i a_i b_i = \|a\|\,\|b\|\,\cos\theta
 | **RAG fit** | Natural for “nearest neighbor” framing; many ANN indexes default to L2 |
 
 **Trade-off:** Sensitive to scale. For **unit-normalized** vectors, \(\|a-b\|_2^2 = 2 - 2\,(a\cdot b)\), so Euclidean ranking is monotonically equivalent to cosine / inner product.
+
+---
+
+## Head-to-head comparison
+
+| Question | Cosine | Inner Product | Euclidean |
+|---|---|---|---|
+| Sensitive to vector length? | No | Yes | Yes |
+| Good with unit-normalized embeddings? | Ideal | ≡ cosine | Monotone ↔ cosine |
+| Ranking rule | `argmax` | `argmax` | `argmin` |
+| Intuition | “Same direction?” | “Aligned *and* strong?” | “How far apart?” |
+| Typical text-RAG default | Yes | Yes (if normalized) | Sometimes (ANN / L2 indexes) |
+| Performance (dense brute force) | Normalize + matmul, or fused cosine | Single matmul | `cdist` / squared L2 |
+
+### Performance characteristics (dense retrieval)
+
+For a corpus of \(n\) vectors in dimension \(d\):
+
+| Metric | Dominant cost | Notes |
+|---|---|---|
+| Inner product | \(O(nd)\) matmul `D @ q` | Fastest when vectors are already normalized |
+| Cosine | \(O(nd)\) + norm costs | Often implemented as normalize-once + inner product |
+| Euclidean | \(O(nd)\) | Squared L2 avoids `sqrt` for ranking; still \(O(nd)\) |
+
+At RAG prototype scale (thousands of docs), all three are fine on CPU. At millions of vectors, use an ANN index / vector DB — the **metric choice still matters** for recall quality even when the index changes.
+
+---
+
+## When rankings disagree
+
+Magnitudes break ties between metrics. The repo ships a 2D demo where each metric picks a **different** winner:
+
+| Doc | Geometry | Favored by |
+|---|---|---|
+| A | Short, tightly aligned with the query | **Cosine** |
+| B | Long, roughly aligned | **Inner Product** |
+| C | Closest point to the query | **Euclidean** |
+
+```bash
+python examples/run_comparison.py
+```
+
+You should see raw-vector winners disagree, then agree (cosine ≡ inner product) after L2-normalization.
+
+---
+
+## Normalization: cosine ≡ inner product
+
+Practical RAG pattern:
+
+1. Embed query and documents  
+2. **L2-normalize** every vector to unit length  
+3. Cosine similarity collapses to the **inner product**  
+4. Rank with `argmax` on `D @ q`  
+
+```text
+cosine(a, b) = a·b    when ||a|| = ||b|| = 1
+```
+
+Many embedding models already return normalized vectors. In that case, “cosine search” and “dot-product search” are the same operation — pick whichever API your stack exposes.
 
 ---
