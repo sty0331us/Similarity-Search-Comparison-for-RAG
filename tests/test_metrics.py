@@ -1,11 +1,13 @@
-"""Parity tests: Manual / NumPy / SciPy / PyTorch should agree within tolerance."""
+"""Metric behavior tests plus backend parity checks."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from src.compare import backends_agree_on_argmax, compare_backends
+from src.compare import backends_agree_on_argmax, compare_backends, compare_metrics
+from src.data.samples import magnitude_disagreement_vectors
+from src.metrics import Metric
 from src.metrics.backends import manual, numpy_backend, scipy_backend, torch_backend
 
 
@@ -65,3 +67,14 @@ def test_compare_backends_agree(corpus_and_query):
     assert backends_agree_on_argmax(results)
     for result in results:
         assert result.best_index == int(numpy_backend.argmax_cosine(docs, query))
+
+
+def test_magnitude_demo_metrics_disagree():
+    docs, query, _ = magnitude_disagreement_vectors()
+    comparison = compare_metrics(docs, query)
+    winners = {r.metric: r.best_index for r in comparison.results}
+
+    assert winners[Metric.COSINE] == 0
+    assert winners[Metric.INNER_PRODUCT] == 1
+    assert winners[Metric.EUCLIDEAN] == 2
+    assert not comparison.all_agree_on_best
