@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vector-similarity-metrics-for-rag"
 version = "0.1.0"
-description = "Compare Manual, NumPy, SciPy, and PyTorch similarity search for RAG"
+description = "Compare Cosine Similarity, Inner Product, and Euclidean Distance for RAG retrieval"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
